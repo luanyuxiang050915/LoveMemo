@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>💝 纪念日便签</title>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --pink: #e87890;
+    --pink-light: #fce4e9;
+    --text: #5a3e4b;
+    --text-dim: #8b6b7a;
+    --glass: rgba(255,255,255,0.7);
+    --glass-border: rgba(255,255,255,0.6);
+  }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh;
+  }
+  /* 便签本体 */
+  .widget {
+    width: 320px;
+    min-height: 420px;
+    background: linear-gradient(160deg, #fff8f9 0%, #fff0f3 40%, #fef5f7 100%);
+    border-radius: 24px;
+    padding: 28px 24px 22px;
+    box-shadow:
+      0 8px 40px rgba(180,100,120,0.15),
+      0 2px 8px rgba(0,0,0,0.06),
+      inset 0 1px 0 rgba(255,255,255,0.8);
+    position: relative;
+    overflow: hidden;
+    display: flex; flex-direction: column; gap: 18px;
+    user-select: none;
+  }
+  /* 顶部渐变装饰 */
+  .widget::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg, #f0b0c0, #e87890, #d4788f, #e87890, #f0b0c0);
+    border-radius: 24px 24px 0 0;
+  }
+  /* 纹理点 */
+  .widget::after {
+    content: ''; position: absolute; inset: 0;
+    background-image: radial-gradient(circle, rgba(200,140,160,0.06) 0.5px, transparent 0.5px);
+    background-size: 16px 16px;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .widget > * { position: relative; z-index: 1; }
+
+  /* 头部 */
+  .widget-header {
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .widget-date {
+    font-size: 13px; color: var(--text-dim);
+    font-weight: 500;
+  }
+  .widget-title {
+    font-size: 16px; font-weight: 700; color: var(--text);
+    letter-spacing: 1px;
+  }
+  .widget-title span { color: var(--pink); }
+
+  /* 今天有纪念日 */
+  .today-banner {
+    background: linear-gradient(135deg, #fce4ec, #f8d0db);
+    border-radius: 16px; padding: 16px;
+    text-align: center;
+    animation: glow 2s ease-in-out infinite;
+    border: 1px solid rgba(232,120,144,0.2);
+  }
+  @keyframes glow {
+    0%,100% { box-shadow: 0 0 0 0 rgba(232,120,144,0.25); }
+    50% { box-shadow: 0 0 20px 4px rgba(232,120,144,0.18); }
+  }
+  .today-banner .big-emoji { font-size: 40px; display: block; margin-bottom: 4px; }
+  .today-banner .msg { font-size: 14px; font-weight: 600; color: var(--pink); }
+
+  /* 纪念日列表 */
+  .mem-list { display: flex; flex-direction: column; gap: 10px; flex: 1; }
+  .mem-item {
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(255,255,255,0.6);
+    border-radius: 14px; padding: 12px 14px;
+    border: 1px solid rgba(255,255,255,0.7);
+    transition: all 0.2s;
+  }
+  .mem-item:hover { background: rgba(255,255,255,0.9); transform: translateX(3px); }
+  .mem-emoji { font-size: 28px; flex-shrink: 0; }
+  .mem-info { flex: 1; min-width: 0; }
+  .mem-name { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mem-date-detail { font-size: 11px; color: var(--text-dim); }
+  .mem-badge {
+    flex-shrink: 0;
+    min-width: 52px; text-align: center;
+    font-size: 13px; font-weight: 700;
+    padding: 6px 10px; border-radius: 20px;
+  }
+  .mem-badge.today-badge {
+    background: var(--pink); color: #fff;
+    animation: badgePulse 1.5s ease-in-out infinite;
+  }
+  @keyframes badgePulse {
+    0%,100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+  }
+  .mem-badge.soon { background: rgba(232,120,144,0.15); color: var(--pink); }
+  .mem-badge.later { background: rgba(0,0,0,0.04); color: var(--text-dim); }
+
+  /* 空状态 */
+  .empty { text-align: center; padding: 30px 0; color: var(--text-dim); font-size: 13px; }
+
+  /* 底部 */
+  .widget-footer {
+    text-align: center;
+    font-size: 11px; color: var(--text-dim);
+    opacity: 0.6; letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+<div class="widget" id="widget">
+  <div class="widget-header">
+    <span class="widget-title">💝 <span>纪念日便签</span></span>
+    <span class="widget-date" id="todayDate"></span>
+  </div>
+  <div class="today-banner hidden" id="todayBanner"></div>
+  <div class="mem-list" id="memList"></div>
+  <div class="widget-footer">纪念日 · 每一天都值得</div>
+</div>
+
+<script>
+(async function() {
+  const STORAGE_KEY = 'countdown_data';
+  let useServer = false;
+
+  // 尝试连接服务器
+  try {
+    const res = await fetch('http://127.0.0.1:5000/api/data');
+    if (res.ok) {
+      useServer = true;
+      const serverData = await res.json();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serverData));
+    }
+  } catch(e) {}
+
+  // 读数据
+  let memorials = [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      memorials = Array.isArray(data.memorials) ? data.memorials : [];
+    }
+  } catch(e) {}
+
+  // 计算纪念日信息
+  function getMemorialInfo(m) {
+    const now = new Date();
+    const d = new Date(m.date);
+    const origYear = d.getFullYear();
+    const origMonth = d.getMonth();
+    const origDay = d.getDate();
+
+    let yearsPassed = now.getFullYear() - origYear;
+    const thisYear = new Date(now.getFullYear(), origMonth, origDay);
+    if (now < thisYear) yearsPassed--;
+
+    let nextDate = new Date(now.getFullYear(), origMonth, origDay);
+    if (nextDate <= now) nextDate = new Date(now.getFullYear() + 1, origMonth, origDay);
+
+    const daysLeft = Math.ceil((nextDate.getTime() - now.getTime()) / 86400000);
+    const isToday = (now.getMonth() === origMonth && now.getDate() === origDay);
+
+    return { origYear, yearsPassed, daysLeft, isToday, origMonth, origDay };
+  }
+
+  // 渲染
+  document.getElementById('todayDate').textContent = new Date().toLocaleDateString('zh-CN', { month:'long', day:'numeric', weekday:'short' });
+
+  if (memorials.length === 0) {
+    document.getElementById('memList').innerHTML = '<div class="empty">📭 还没有纪念日<br>去后台添加吧~</div>';
+  } else {
+    const infos = memorials.map(m => ({ m, info: getMemorialInfo(m) }));
+    infos.sort((a,b) => a.info.daysLeft - b.info.daysLeft);
+
+    const todayMems = infos.filter(x => x.info.isToday);
+    if (todayMems.length > 0) {
+      const banner = document.getElementById('todayBanner');
+      banner.classList.remove('hidden');
+      const mem = todayMems[0];
+      banner.innerHTML = `<span class="big-emoji">${mem.m.emoji || '💝'}</span><div class="msg">🎉 今天！${mem.m.title} ${mem.info.yearsPassed} 周年</div>`;
+    }
+
+    const list = infos.slice(0, 8);
+    document.getElementById('memList').innerHTML = list.map(({m, info}) => {
+      let badgeClass, badgeText;
+      if (info.isToday) {
+        badgeClass = 'today-badge'; badgeText = '今天';
+      } else if (info.daysLeft <= 30) {
+        badgeClass = 'soon'; badgeText = info.daysLeft + '天后';
+      } else {
+        badgeClass = 'later'; badgeText = info.daysLeft + '天后';
+      }
+      return `<div class="mem-item">
+        <span class="mem-emoji">${m.emoji || '💝'}</span>
+        <div class="mem-info">
+          <div class="mem-name">${m.title}</div>
+          <div class="mem-date-detail">每年${info.origMonth+1}月${info.origDay}日 · ${info.yearsPassed}周年</div>
+        </div>
+        <span class="mem-badge ${badgeClass}">${badgeText}</span>
+      </div>`;
+    }).join('');
+  }
+
+  // 每天刷新
+  setInterval(() => location.reload(), 3600000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>倒计时 - 后台管理</title>
+<style>
+  :root {
+    --bg: #0f0f1a;
+    --card: #1a1a2e;
+    --card-hover: #222240;
+    --border: #2a2a4a;
+    --text: #e0e0f0;
+    --text-dim: #8888aa;
+    --accent: #7c5cfc;
+    --accent-glow: rgba(124,92,252,0.3);
+    --danger: #ff4757;
+    --danger-glow: rgba(255,71,87,0.3);
+    --success: #2ed573;
+    --warning: #ffa502;
+    --radius: 14px;
+    --radius-sm: 10px;
+    --transition: 0.25s cubic-bezier(0.4,0,0.2,1);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse at 20% 20%, rgba(124,92,252,0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 80%, rgba(255,71,87,0.04) 0%, transparent 50%);
+  }
+  /* ============ LOGIN ============ */
+  .login-overlay {
+    position: fixed; inset: 0; z-index: 999;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .login-overlay.hidden { display: none; }
+  .login-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 48px 40px;
+    width: 400px; text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .login-box h1 { font-size: 28px; margin-bottom: 8px; }
+  .login-box .sub { color: var(--text-dim); font-size: 14px; margin-bottom: 32px; }
+  .login-box input {
+    width: 100%; padding: 14px 18px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text); font-size: 15px;
+    outline: none; transition: var(--transition);
+    text-align: center; letter-spacing: 6px;
+  }
+  .login-box input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+  .login-box .btn {
+    margin-top: 20px; width: 100%; padding: 14px;
+    background: var(--accent); color: #fff;
+    border: none; border-radius: var(--radius-sm);
+    font-size: 16px; cursor: pointer; transition: var(--transition);
+  }
+  .login-box .btn:hover { box-shadow: 0 0 24px var(--accent-glow); transform: translateY(-1px); }
+  .login-box .hint { color: var(--text-dim); font-size: 12px; margin-top: 16px; }
+  .login-error { color: var(--danger); font-size: 13px; margin-top: 12px; }
+  /* ============ MAIN LAYOUT ============ */
+  .main-container { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+  .main-container.hidden { display: none; }
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px; flex-wrap: wrap; gap: 16px;
+  }
+  .header h1 { font-size: 26px; font-weight: 700; }
+  .header h1 span { color: var(--accent); }
+  .header-actions { display: flex; gap: 12px; align-items: center; }
+  /* Tab navigation */
+  .admin-tabs {
+    display: flex; gap: 4px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 30px; padding: 4px;
+    margin-bottom: 28px;
+  }
+  .admin-tab {
+    padding: 10px 24px; border-radius: 26px;
+    border: none; background: transparent;
+    color: var(--text-dim); font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: var(--transition);
+    font-family: inherit;
+  }
+  .admin-tab.active {
+    background: var(--accent); color: #fff;
+    box-shadow: 0 4px 16px var(--accent-glow);
+  }
+  .admin-tab:hover:not(.active) { color: var(--text); }
+  /* Content panels */
+  .admin-panel { display: none; }
+  .admin-panel.active { display: block; }
+  /* Stats */
+  .stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr));
+    gap: 16px; margin-bottom: 32px;
+  }
+  .stat-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px 24px;
+  }
+  .stat-card .stat-num { font-size: 32px; font-weight: 700; color: var(--accent); }
+  .stat-card .stat-label { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+  /* Grid */
+  .cd-grid {
+    display: grid; gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  }
+  .cd-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 24px;
+    transition: var(--transition); position: relative; overflow: hidden;
+  }
+  .cd-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 8px 32px var(--accent-glow);
+    transform: translateY(-2px);
+  }
+  .cd-card.pinned { border-color: var(--warning); }
+  .cd-card.pinned::before {
+    content: '📌 置顶'; position: absolute; top: 14px; right: 14px;
+    font-size: 11px; color: var(--warning); background: rgba(255,165,2,0.1);
+    padding: 3px 10px; border-radius: 20px;
+  }
+  .cd-card .cd-emoji { font-size: 40px; margin-bottom: 12px; display: block; }
+  .cd-card .cd-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .cd-card .cd-desc { font-size: 13px; color: var(--text-dim); margin-bottom: 16px; line-height: 1.5; }
+  .cd-card .cd-date { font-size: 13px; color: var(--text-dim); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+  .cd-card .cd-preview {
+    background: rgba(255,255,255,0.03); border-radius: var(--radius-sm);
+    padding: 16px; display: flex; gap: 16px; align-items: center; margin-bottom: 16px;
+  }
+  .cd-card .cd-preview .num { font-size: 26px; font-weight: 700; color: var(--accent); min-width: 50px; text-align: center; }
+  .cd-card .cd-preview .unit { font-size: 11px; color: var(--text-dim); text-align: center; }
+  .cd-card .cd-preview .sep { font-size: 22px; color: var(--text-dim); }
+  .cd-card .cd-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .cd-card .color-dot {
+    display: inline-block; width: 14px; height: 14px; border-radius: 50%;
+    vertical-align: middle; margin-right: 6px; border: 2px solid rgba(255,255,255,0.2);
+  }
+  .cd-card .mem-info {
+    display: flex; gap: 20px; margin-bottom: 16px;
+  }
+  .cd-card .mem-info .mem-stat { text-align: center; }
+  .cd-card .mem-info .mem-stat .ms-num { font-size: 28px; font-weight: 700; color: var(--accent); }
+  .cd-card .mem-info .mem-stat .ms-label { font-size: 11px; color: var(--text-dim); }
+  /* Buttons */
+  .btn {
+    padding: 10px 20px; border-radius: var(--radius-sm);
+    font-size: 14px; cursor: pointer; border: none;
+    transition: var(--transition); font-weight: 600;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { box-shadow: 0 0 20px var(--accent-glow); }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm { padding: 6px 14px; font-size: 12px; }
+  .btn-danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
+  .btn-danger:hover { background: var(--danger); color: #fff; box-shadow: 0 0 16px var(--danger-glow); }
+  .btn-warning { background: transparent; border: 1px solid var(--warning); color: var(--warning); }
+  .btn-warning:hover { background: var(--warning); color: #000; }
+  .btn-icon {
+    width: 38px; height: 38px; border-radius: 50%; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    cursor: pointer; font-size: 16px; transition: var(--transition);
+  }
+  .btn-icon:hover { border-color: var(--accent); }
+  /* Empty */
+  .empty-state { text-align: center; padding: 80px 20px; }
+  .empty-state .icon { font-size: 64px; margin-bottom: 20px; }
+  .empty-state h2 { font-size: 22px; margin-bottom: 8px; }
+  .empty-state p { color: var(--text-dim); margin-bottom: 24px; }
+  /* Modal */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center;
+    animation: fadeIn 0.2s ease;
+  }
+  .modal-overlay.hidden { display: none; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .modal {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 32px;
+    width: 520px; max-width: 95vw; max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+    animation: slideUp 0.3s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .modal h2 { font-size: 22px; margin-bottom: 24px; }
+  .form-group { margin-bottom: 20px; }
+  .form-group label {
+    display: block; font-size: 13px; font-weight: 600;
+    color: var(--text-dim); margin-bottom: 8px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .form-group input, .form-group textarea {
+    width: 100%; padding: 12px 16px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text); font-size: 15px;
+    outline: none; transition: var(--transition);
+    font-family: inherit;
+  }
+  .form-group input:focus, .form-group textarea:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+  .form-group textarea { resize: vertical; min-height: 80px; }
+  .form-row { display: flex; gap: 12px; }
+  .form-row > * { flex: 1; }
+  .emoji-picker { display: flex; flex-wrap: wrap; gap: 8px; }
+  .emoji-picker .emo {
+    width: 44px; height: 44px; border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; cursor: pointer; border: 2px solid transparent;
+    background: rgba(255,255,255,0.03); transition: var(--transition);
+  }
+  .emoji-picker .emo:hover, .emoji-picker .emo.active {
+    border-color: var(--accent); background: rgba(124,92,252,0.1);
+  }
+  .color-options { display: flex; flex-wrap: wrap; gap: 8px; }
+  .color-opt {
+    width: 36px; height: 36px; border-radius: 50%;
+    cursor: pointer; border: 3px solid transparent; transition: var(--transition);
+  }
+  .color-opt:hover, .color-opt.active { border-color: #fff; transform: scale(1.15); }
+  .modal-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 28px; }
+  /* Toast */
+  .toast {
+    position: fixed; top: 24px; right: 24px; z-index: 9999;
+    background: var(--card); border: 1px solid var(--border);
+    padding: 14px 24px; border-radius: var(--radius-sm);
+    font-size: 14px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    animation: slideIn 0.3s ease; display: flex; align-items: center; gap: 8px;
+  }
+  .toast.success { border-color: var(--success); }
+  .toast.error { border-color: var(--danger); }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  .confirm-text { color: var(--text-dim); margin-bottom: 24px; line-height: 1.6; }
+  .confirm-text strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+<!-- LOGIN OVERLAY -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <div style="font-size:48px;margin-bottom:12px;">🔒</div>
+    <h1>后台管理</h1>
+    <p class="sub" id="loginSub">Q&L · 后台管理</p>
+    <input type="password" id="loginInput" placeholder="输入密码" maxlength="20" autofocus>
+    <p class="login-error" id="loginError"></p>
+    <button class="btn" onclick="doLogin()">进 入</button>
+    <p class="hint" id="loginHint">默认密码: Lyx20050915@</p>
+  </div>
+</div>
+
+<!-- MAIN CONTAINER -->
+<div class="main-container hidden" id="mainContainer">
+  <div class="header">
+    <h1>⚙️ <span id="headerTitle">纪念日管理</span></h1>
+    <div class="header-actions">
+      <button class="btn btn-outline btn-sm" onclick="openSettings()">⚙️ 设置</button>
+      <button class="btn btn-primary" id="addBtn" onclick="openAddMemorial()">+ 新增纪念日</button>
+    </div>
+  </div>
+
+  <!-- Admin Tabs -->
+  <div class="admin-tabs" id="adminTabs">
+    <button class="admin-tab active" data-tab="memorial">💝 纪念日管理</button>
+    <button class="admin-tab" data-tab="countdown">⏳ 倒计时管理</button>
+  </div>
+
+  <!-- Memorial Panel -->
+  <div class="admin-panel active" id="panelMemorial">
+    <div class="stats" id="statsMemorial"></div>
+    <div class="cd-grid" id="memGrid"></div>
+    <div class="empty-state hidden" id="memEmpty">
+      <div class="icon">💝</div>
+      <h2>还没有纪念日</h2>
+      <p>点击「新增纪念日」记录你们的重要日子吧</p>
+      <button class="btn btn-primary" onclick="openAddMemorial()">+ 新增纪念日</button>
+    </div>
+  </div>
+
+  <!-- Countdown Panel -->
+  <div class="admin-panel" id="panelCountdown">
+    <div class="stats" id="statsCountdown"></div>
+    <div class="cd-grid" id="cdGrid"></div>
+    <div class="empty-state hidden" id="cdEmpty">
+      <div class="icon">📭</div>
+      <h2>还没有倒计时</h2>
+      <p>点击「新增倒计时」创建你的第一个倒计时吧</p>
+      <button class="btn btn-primary" onclick="openAddCountdown()">+ 新增倒计时</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Add/Edit Countdown -->
+<div class="modal-overlay hidden" id="cdModalOverlay">
+  <div class="modal">
+    <h2 id="cdModalTitle">新增倒计时</h2>
+    <input type="hidden" id="cdEditId">
+    <div class="form-group"><label>Emoji 图标</label><div class="emoji-picker" id="cdEmojiPicker"></div></div>
+    <div class="form-group"><label>标题 *</label><input type="text" id="cdTitle" placeholder="例如：见面倒计时" maxlength="50"></div>
+    <div class="form-group"><label>描述</label><textarea id="cdDesc" placeholder="写一句话描述..." maxlength="200"></textarea></div>
+    <div class="form-row"><div class="form-group"><label>目标日期时间 *</label><input type="datetime-local" id="cdTarget"></div></div>
+    <div class="form-group"><label>主题色</label><div class="color-options" id="cdColorPicker"></div></div>
+    <div class="form-group" style="display:flex;align-items:center;gap:10px;">
+      <input type="checkbox" id="cdPinned" style="width:auto;accent-color:var(--accent);"><label for="cdPinned" style="margin:0;cursor:pointer;">📌 置顶</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeCdModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveCountdown()">保 存</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Add/Edit Memorial -->
+<div class="modal-overlay hidden" id="memModalOverlay">
+  <div class="modal">
+    <h2 id="memModalTitle">新增纪念日</h2>
+    <input type="hidden" id="memEditId">
+    <div class="form-group"><label>Emoji 图标</label><div class="emoji-picker" id="memEmojiPicker"></div></div>
+    <div class="form-group"><label>标题 *</label><input type="text" id="memTitle" placeholder="例如：恋爱纪念日" maxlength="50"></div>
+    <div class="form-group"><label>描述</label><textarea id="memDesc" placeholder="写一句话描述..." maxlength="200"></textarea></div>
+    <div class="form-group"><label>起始日期 *</label><input type="date" id="memDate" placeholder="选择日期">
+      <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">📌 纪念日每年重复，年份代表第一次发生的年份，用于计算周年</div>
+    </div>
+    <div class="form-group"><label>主题色</label><div class="color-options" id="memColorPicker"></div></div>
+    <div class="form-group" style="display:flex;align-items:center;gap:10px;">
+      <input type="checkbox" id="memPinned" style="width:auto;accent-color:var(--accent);"><label for="memPinned" style="margin:0;cursor:pointer;">📌 置顶</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeMemModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveMemorial()">保 存</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Settings -->
+<div class="modal-overlay hidden" id="settingsOverlay">
+  <div class="modal">
+    <h2>⚙️ 系统设置</h2>
+    <div class="form-group"><label>网站标题</label><input type="text" id="setSiteTitle" maxlength="50"></div>
+    <div class="form-group"><label>修改管理密码</label><input type="password" id="setNewPwd" placeholder="输入新密码（留空不修改）" maxlength="20"></div>
+    <div class="form-group"><label>💕 恋爱起始日期</label><input type="date" id="setLoveStart"><div style="font-size:11px;color:var(--text-dim);margin-top:4px;">用来计算恋爱天数</div></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeSettings()">取消</button>
+      <button class="btn btn-primary" onclick="saveSettings()">保 存</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Confirm Delete -->
+<div class="modal-overlay hidden" id="confirmOverlay">
+  <div class="modal">
+    <h2>⚠️ 确认删除</h2>
+    <p class="confirm-text" id="confirmText">确定要删除 <strong id="confirmName"></strong> 吗？此操作不可撤销。</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeConfirm()">取消</button>
+      <button class="btn btn-danger" onclick="confirmDelete()">确认删除</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  const STORAGE_KEY = 'countdown_data';
+  const API_URL = '/api/data';
+  const EMOJIS = ['❤️','💕','💖','💗','💝','💘','🎂','🎉','✨','🌟','🎯','✈️','🏖️','🎄','🎁','💍','🏠','🚗','🎵','📅','⏳','🔥','💪','🌈','🦋','🌸','🌺','🍀','⭐','💎'];
+  const COLORS = ['#ff6b9d','#e8507a','#ff9a9e','#ff4757','#ffa502','#2ed573','#1e90ff','#7c5cfc','#c9b1d9','#ffb3c1','#00d2ff','#f9ca24'];
+
+  let currentTab = 'memorial';
+  let deleteTargetId = null;
+  let deleteTargetType = null;
+  let useServer = false;
+
+  // ==================== 数据操作 ====================
+  function loadData() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return getDefaultData();
+      const data = JSON.parse(raw);
+      return {
+        countdowns: Array.isArray(data.countdowns) ? data.countdowns : [],
+        memorials: Array.isArray(data.memorials) ? data.memorials : [],
+        settings: typeof data.settings === 'object' && data.settings !== null
+          ? { siteTitle: data.settings.siteTitle || 'Q&L', password: data.settings.password || 'Lyx20050915@', ...data.settings }
+          : getDefaultData().settings
+      };
+    } catch (e) { return getDefaultData(); }
+  }
+
+  function getDefaultData() {
+    return { countdowns: [], memorials: [], settings: { siteTitle: 'Q&L', password: 'Lyx20050915@' } };
+  }
+
+  function saveData(data) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    if (useServer) {
+      fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).catch(() => {});
+    }
+  }
+
+  // ==================== 登录 ====================
+  window.doLogin = async function() {
+    const input = document.getElementById('loginInput');
+    const data = loadData();
+    const pwd = data.settings.password || 'Lyx20050915@';
+    if (input.value === pwd) {
+      // 探测服务器
+      try {
+        const res = await fetch(API_URL);
+        if (res.ok) {
+          useServer = true;
+          const serverData = await res.json();
+          if (serverData && (serverData.countdowns || serverData.memorials)) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(serverData));
+          }
+          console.log('✅ 数据存储到 data.json');
+        }
+      } catch (e) { console.log('💾 数据存储到浏览器本地'); }
+      document.getElementById('loginOverlay').classList.add('hidden');
+      document.getElementById('mainContainer').classList.remove('hidden');
+      document.getElementById('loginError').textContent = '';
+      input.value = '';
+      refreshAll();
+    } else {
+      document.getElementById('loginError').textContent = '密码错误，请重试';
+      input.value = ''; input.focus();
+    }
+  };
+
+  document.getElementById('loginInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doLogin();
+  });
+
+  // ==================== Tab 切换 ====================
+  document.getElementById('adminTabs').addEventListener('click', function(e) {
+    const tab = e.target.closest('.admin-tab');
+    if (!tab) return;
+    switchAdminTab(tab.dataset.tab);
+  });
+
+  function switchAdminTab(tabName) {
+    currentTab = tabName;
+    document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.admin-panel').forEach(p => p.classList.remove('active'));
+    document.querySelector(`.admin-tab[data-tab="${tabName}"]`).classList.add('active');
+    document.getElementById('panel' + (tabName === 'countdown' ? 'Countdown' : 'Memorial')).classList.add('active');
+
+    if (tabName === 'countdown') {
+      document.getElementById('headerTitle').textContent = '倒计时管理';
+      document.getElementById('addBtn').textContent = '+ 新增倒计时';
+      document.getElementById('addBtn').onclick = openAddCountdown;
+    } else {
+      document.getElementById('headerTitle').textContent = '纪念日管理';
+      document.getElementById('addBtn').textContent = '+ 新增纪念日';
+      document.getElementById('addBtn').onclick = openAddMemorial;
+    }
+    refreshAll();
+  }
+
+  // ==================== 渲染 ====================
+  function refreshAll() {
+    const data = loadData();
+    if (currentTab === 'countdown') {
+      renderCountdownStats(data);
+      renderCountdownGrid(data);
+    } else {
+      renderMemorialStats(data);
+      renderMemorialGrid(data);
+    }
+  }
+
+  // --- Countdown ---
+  function renderCountdownStats(data) {
+    const total = data.countdowns.length;
+    const now = Date.now();
+    let active = 0, expired = 0, pinned = 0;
+    data.countdowns.forEach(c => {
+      if (c.pinned) pinned++;
+      if (new Date(c.targetDate).getTime() <= now) expired++; else active++;
+    });
+    document.getElementById('statsCountdown').innerHTML = `
+      <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">📋 总数</div></div>
+      <div class="stat-card"><div class="stat-num">${active}</div><div class="stat-label">⏳ 进行中</div></div>
+      <div class="stat-card"><div class="stat-num">${expired}</div><div class="stat-label">🎉 已到达</div></div>
+      <div class="stat-card"><div class="stat-num">${pinned}</div><div class="stat-label">📌 置顶</div></div>`;
+  }
+
+  function renderCountdownGrid(data) {
+    const grid = document.getElementById('cdGrid');
+    const empty = document.getElementById('cdEmpty');
+    const sorted = [...data.countdowns].sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      return new Date(a.targetDate).getTime() - new Date(b.targetDate).getTime();
+    });
+    if (sorted.length === 0) { grid.innerHTML = ''; empty.classList.remove('hidden'); }
+    else { empty.classList.add('hidden'); grid.innerHTML = sorted.map(c => renderCountdownCard(c)).join(''); }
+  }
+
+  function renderCountdownCard(c) {
+    const emoji = c.emoji || '⏳';
+    const desc = c.description || '';
+    const color = c.color || '#ff6b9d';
+    const pinnedClass = c.pinned ? ' pinned' : '';
+    const targetFormatted = formatDateFull(c.targetDate);
+    const remaining = calcRemaining(c.targetDate);
+    let previewHTML = '';
+    if (remaining.expired) {
+      previewHTML = '<span style="color:var(--warning);font-weight:700;font-size:18px;">🎉 已到达！</span>';
+    } else {
+      const parts = [];
+      if (remaining.days > 0) parts.push(`<div><div class="num">${remaining.days}</div><div class="unit">天</div></div>`);
+      parts.push(`<div><div class="num">${remaining.hours}</div><div class="unit">时</div></div>`);
+      parts.push(`<div><div class="num">${remaining.minutes}</div><div class="unit">分</div></div>`);
+      parts.push(`<div><div class="num">${remaining.seconds}</div><div class="unit">秒</div></div>`);
+      previewHTML = parts.join('<span class="sep">:</span>');
+    }
+    return `<div class="cd-card${pinnedClass}" data-id="${escHtml(c.id)}">
+      <span class="cd-emoji">${emoji}</span>
+      <h3 class="cd-title"><span class="color-dot" style="background:${color};"></span>${escHtml(c.title)}</h3>
+      ${desc ? `<p class="cd-desc">${escHtml(desc)}</p>` : ''}
+      <p class="cd-date">📅 ${targetFormatted}</p>
+      <div class="cd-preview">${previewHTML}</div>
+      <div class="cd-actions">
+        <button class="btn btn-outline btn-sm" onclick="openEditCountdown('${escHtml(c.id)}')">✏️ 编辑</button>
+        <button class="btn btn-warning btn-sm" onclick="toggleCdPin('${escHtml(c.id)}')">${c.pinned ? '📌 取消置顶' : '📌 置顶'}</button>
+        <button class="btn btn-danger btn-sm" onclick="askDeleteCd('${escHtml(c.id)}')">🗑 删除</button>
+      </div></div>`;
+  }
+
+  function calcRemaining(targetDateStr) {
+    const diff = new Date(targetDateStr).getTime() - Date.now();
+    if (diff <= 0) return { expired: true, days: 0, hours: 0, minutes: 0, seconds: 0 };
+    const ts = Math.floor(diff / 1000);
+    return { expired: false, days: Math.floor(ts/86400), hours: Math.floor((ts%86400)/3600), minutes: Math.floor((ts%3600)/60), seconds: ts%60 };
+  }
+
+  function formatDateFull(dateStr) {
+    try {
+      const d = new Date(dateStr);
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch(e) { return dateStr; }
+  }
+
+  function formatDateShort(dateStr) {
+    try {
+      const d = new Date(dateStr);
+      return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+    } catch(e) { return dateStr; }
+  }
+
+  // --- Memorial ---
+  function getMemorialInfo(m) {
+    const now = new Date();
+    const origDate = new Date(m.date);
+    const origYear = origDate.getFullYear();
+    const origMonth = origDate.getMonth();
+    const origDay = origDate.getDate();
+    let yearsPassed = now.getFullYear() - origYear;
+    const thisYearDate = new Date(now.getFullYear(), origMonth, origDay);
+    if (now < thisYearDate) yearsPassed--;
+    let nextDate = new Date(now.getFullYear(), origMonth, origDay);
+    if (nextDate <= now) nextDate = new Date(now.getFullYear() + 1, origMonth, origDay);
+    const daysLeft = Math.ceil((nextDate.getTime() - now.getTime()) / (1000*60*60*24));
+    const isToday = (now.getMonth() === origMonth && now.getDate() === origDay);
+    const daysSince = Math.floor((now.getTime() - origDate.getTime()) / (1000*60*60*24));
+    return { origYear, origMonth, origDay, yearsPassed, daysLeft, isToday, daysSince };
+  }
+
+  function renderMemorialStats(data) {
+    const total = data.memorials.length;
+    const now = new Date();
+    let todayCount = 0, pinned = 0;
+    data.memorials.forEach(m => {
+      if (m.pinned) pinned++;
+      const d = new Date(m.date);
+      if (now.getMonth() === d.getMonth() && now.getDate() === d.getDate()) todayCount++;
+    });
+    document.getElementById('statsMemorial').innerHTML = `
+      <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">💝 总数</div></div>
+      <div class="stat-card"><div class="stat-num">${todayCount}</div><div class="stat-label">🎉 今天</div></div>
+      <div class="stat-card"><div class="stat-num">${pinned}</div><div class="stat-label">📌 置顶</div></div>`;
+  }
+
+  function renderMemorialGrid(data) {
+    const grid = document.getElementById('memGrid');
+    const empty = document.getElementById('memEmpty');
+    const sorted = [...data.memorials].sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      const ia = getMemorialInfo(a), ib = getMemorialInfo(b);
+      if (ia.isToday && !ib.isToday) return -1;
+      if (!ia.isToday && ib.isToday) return 1;
+      return ia.daysLeft - ib.daysLeft;
+    });
+    if (sorted.length === 0) { grid.innerHTML = ''; empty.classList.remove('hidden'); }
+    else { empty.classList.add('hidden'); grid.innerHTML = sorted.map(m => renderMemorialCard(m)).join(''); }
+  }
+
+  function renderMemorialCard(m) {
+    const info = getMemorialInfo(m);
+    const emoji = m.emoji || '💝';
+    const desc = m.description || '';
+    const color = m.color || '#ff6b9d';
+    const pinnedClass = m.pinned ? ' pinned' : '';
+    const isToday = info.isToday;
+    return `<div class="cd-card${pinnedClass}" data-id="${escHtml(m.id)}" style="${isToday ? 'border-color:var(--warning);box-shadow:0 0 24px rgba(255,165,2,0.2);' : ''}">
+      <span class="cd-emoji">${emoji}</span>
+      <h3 class="cd-title"><span class="color-dot" style="background:${color};"></span>${escHtml(m.title)}${isToday ? ' 🎉' : ''}</h3>
+      ${desc ? `<p class="cd-desc">${escHtml(desc)}</p>` : ''}
+      <p class="cd-date">📅 每年${info.origMonth+1}月${info.origDay}日 · 始于 ${info.origYear}年</p>
+      <div class="mem-info">
+        <div class="mem-stat"><div class="ms-num">${info.yearsPassed}</div><div class="ms-label">周年</div></div>
+        <div class="mem-stat"><div class="ms-num">${info.daysSince}</div><div class="ms-label">总天数</div></div>
+        <div class="mem-stat"><div class="ms-num">${isToday ? '🎉' : info.daysLeft}</div><div class="ms-label">${isToday ? '就是今天！' : '距下次(天)'}</div></div>
+      </div>
+      <div class="cd-actions">
+        <button class="btn btn-outline btn-sm" onclick="openEditMemorial('${escHtml(m.id)}')">✏️ 编辑</button>
+        <button class="btn btn-warning btn-sm" onclick="toggleMemPin('${escHtml(m.id)}')">${m.pinned ? '📌 取消置顶' : '📌 置顶'}</button>
+        <button class="btn btn-danger btn-sm" onclick="askDeleteMem('${escHtml(m.id)}')">🗑 删除</button>
+      </div></div>`;
+  }
+
+  function escHtml(s) {
+    const div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  // ==================== Countdown Modal ====================
+  function buildEmojiPicker(selected, pickerId) {
+    return EMOJIS.map(e => `<span class="emo${e === selected ? ' active' : ''}" onclick="selectEmoji('${e}','${pickerId}')">${e}</span>`).join('');
+  }
+  function buildColorPicker(selected, pickerId) {
+    return COLORS.map(c => `<span class="color-opt${c === selected ? ' active' : ''}" style="background:${c};" onclick="selectColor('${c}','${pickerId}')"></span>`).join('');
+  }
+
+  window.selectEmoji = function(emoji, pickerId) {
+    const picker = document.getElementById(pickerId);
+    picker.querySelectorAll('.emo').forEach(el => el.classList.remove('active'));
+    picker.querySelectorAll('.emo').forEach(el => { if (el.textContent === emoji) el.classList.add('active'); });
+    picker.dataset.value = emoji;
+  };
+  window.selectColor = function(color, pickerId) {
+    const picker = document.getElementById(pickerId);
+    picker.querySelectorAll('.color-opt').forEach(el => el.classList.remove('active'));
+    picker.querySelectorAll('.color-opt').forEach(el => { if (el.style.background === color) el.classList.add('active'); });
+    picker.dataset.value = color;
+  };
+
+  window.openAddCountdown = function() {
+    document.getElementById('cdModalTitle').textContent = '新增倒计时';
+    document.getElementById('cdEditId').value = '';
+    document.getElementById('cdTitle').value = '';
+    document.getElementById('cdDesc').value = '';
+    document.getElementById('cdTarget').value = '';
+    document.getElementById('cdPinned').checked = false;
+    const ep = document.getElementById('cdEmojiPicker');
+    ep.innerHTML = buildEmojiPicker('❤️', 'cdEmojiPicker');
+    ep.dataset.value = '❤️';
+    const cp = document.getElementById('cdColorPicker');
+    cp.innerHTML = buildColorPicker('#ff6b9d', 'cdColorPicker');
+    cp.dataset.value = '#ff6b9d';
+    document.getElementById('cdModalOverlay').classList.remove('hidden');
+  };
+
+  window.openEditCountdown = function(id) {
+    const data = loadData();
+    const c = data.countdowns.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById('cdModalTitle').textContent = '编辑倒计时';
+    document.getElementById('cdEditId').value = c.id;
+    document.getElementById('cdTitle').value = c.title;
+    document.getElementById('cdDesc').value = c.description || '';
+    document.getElementById('cdTarget').value = c.targetDate;
+    document.getElementById('cdPinned').checked = !!c.pinned;
+    const ep = document.getElementById('cdEmojiPicker');
+    ep.innerHTML = buildEmojiPicker(c.emoji || '❤️', 'cdEmojiPicker');
+    ep.dataset.value = c.emoji || '❤️';
+    const cp = document.getElementById('cdColorPicker');
+    cp.innerHTML = buildColorPicker(c.color || '#ff6b9d', 'cdColorPicker');
+    cp.dataset.value = c.color || '#ff6b9d';
+    document.getElementById('cdModalOverlay').classList.remove('hidden');
+  };
+
+  window.closeCdModal = function() { document.getElementById('cdModalOverlay').classList.add('hidden'); };
+
+  window.saveCountdown = function() {
+    const editId = document.getElementById('cdEditId').value;
+    const title = document.getElementById('cdTitle').value.trim();
+    const desc = document.getElementById('cdDesc').value.trim();
+    const target = document.getElementById('cdTarget').value;
+    const pinned = document.getElementById('cdPinned').checked;
+    const emoji = document.getElementById('cdEmojiPicker').dataset.value || '⏳';
+    const color = document.getElementById('cdColorPicker').dataset.value || '#ff6b9d';
+    if (!title) { showToast('请输入标题', 'error'); return; }
+    if (!target) { showToast('请选择目标日期时间', 'error'); return; }
+    const data = loadData();
+    if (editId) {
+      const idx = data.countdowns.findIndex(c => c.id === editId);
+      if (idx === -1) { showToast('倒计时不存在', 'error'); return; }
+      Object.assign(data.countdowns[idx], { title, description: desc, targetDate: target, emoji, color, pinned });
+    } else {
+      data.countdowns.push({ id: 'cd_' + Date.now(), title, description: desc, targetDate: target, emoji, color, pinned, createdAt: Date.now() });
+    }
+    saveData(data); closeCdModal(); refreshAll();
+    showToast(editId ? '倒计时已更新 ✅' : '倒计时已创建 🎉', 'success');
+  };
+
+  window.toggleCdPin = function(id) {
+    const data = loadData();
+    const c = data.countdowns.find(x => x.id === id);
+    if (!c) return;
+    c.pinned = !c.pinned;
+    saveData(data); refreshAll();
+    showToast(c.pinned ? '已置顶 📌' : '已取消置顶', 'success');
+  };
+
+  window.askDeleteCd = function(id) {
+    deleteTargetId = id; deleteTargetType = 'countdown';
+    const data = loadData();
+    const c = data.countdowns.find(x => x.id === id);
+    document.getElementById('confirmName').textContent = c ? c.title : '';
+    document.getElementById('confirmOverlay').classList.remove('hidden');
+  };
+
+  // ==================== Memorial Modal ====================
+  window.openAddMemorial = function() {
+    document.getElementById('memModalTitle').textContent = '新增纪念日';
+    document.getElementById('memEditId').value = '';
+    document.getElementById('memTitle').value = '';
+    document.getElementById('memDesc').value = '';
+    document.getElementById('memDate').value = '';
+    document.getElementById('memPinned').checked = false;
+    const ep = document.getElementById('memEmojiPicker');
+    ep.innerHTML = buildEmojiPicker('💝', 'memEmojiPicker');
+    ep.dataset.value = '💝';
+    const cp = document.getElementById('memColorPicker');
+    cp.innerHTML = buildColorPicker('#ff6b9d', 'memColorPicker');
+    cp.dataset.value = '#ff6b9d';
+    document.getElementById('memModalOverlay').classList.remove('hidden');
+  };
+
+  window.openEditMemorial = function(id) {
+    const data = loadData();
+    const m = data.memorials.find(x => x.id === id);
+    if (!m) return;
+    document.getElementById('memModalTitle').textContent = '编辑纪念日';
+    document.getElementById('memEditId').value = m.id;
+    document.getElementById('memTitle').value = m.title;
+    document.getElementById('memDesc').value = m.description || '';
+    document.getElementById('memDate').value = m.date;
+    document.getElementById('memPinned').checked = !!m.pinned;
+    const ep = document.getElementById('memEmojiPicker');
+    ep.innerHTML = buildEmojiPicker(m.emoji || '💝', 'memEmojiPicker');
+    ep.dataset.value = m.emoji || '💝';
+    const cp = document.getElementById('memColorPicker');
+    cp.innerHTML = buildColorPicker(m.color || '#ff6b9d', 'memColorPicker');
+    cp.dataset.value = m.color || '#ff6b9d';
+    document.getElementById('memModalOverlay').classList.remove('hidden');
+  };
+
+  window.closeMemModal = function() { document.getElementById('memModalOverlay').classList.add('hidden'); };
+
+  window.saveMemorial = function() {
+    const editId = document.getElementById('memEditId').value;
+    const title = document.getElementById('memTitle').value.trim();
+    const desc = document.getElementById('memDesc').value.trim();
+    const date = document.getElementById('memDate').value;
+    const pinned = document.getElementById('memPinned').checked;
+    const emoji = document.getElementById('memEmojiPicker').dataset.value || '💝';
+    const color = document.getElementById('memColorPicker').dataset.value || '#ff6b9d';
+    if (!title) { showToast('请输入标题', 'error'); return; }
+    if (!date) { showToast('请选择起始日期', 'error'); return; }
+    const data = loadData();
+    if (editId) {
+      const idx = data.memorials.findIndex(m => m.id === editId);
+      if (idx === -1) { showToast('纪念日不存在', 'error'); return; }
+      Object.assign(data.memorials[idx], { title, description: desc, date, emoji, color, pinned });
+    } else {
+      data.memorials.push({ id: 'mem_' + Date.now(), title, description: desc, date, emoji, color, pinned, createdAt: Date.now() });
+    }
+    saveData(data); closeMemModal(); refreshAll();
+    showToast(editId ? '纪念日已更新 ✅' : '纪念日已创建 🎉', 'success');
+  };
+
+  window.toggleMemPin = function(id) {
+    const data = loadData();
+    const m = data.memorials.find(x => x.id === id);
+    if (!m) return;
+    m.pinned = !m.pinned;
+    saveData(data); refreshAll();
+    showToast(m.pinned ? '已置顶 📌' : '已取消置顶', 'success');
+  };
+
+  window.askDeleteMem = function(id) {
+    deleteTargetId = id; deleteTargetType = 'memorial';
+    const data = loadData();
+    const m = data.memorials.find(x => x.id === id);
+    document.getElementById('confirmName').textContent = m ? m.title : '';
+    document.getElementById('confirmOverlay').classList.remove('hidden');
+  };
+
+  // ==================== Delete ====================
+  window.closeConfirm = function() {
+    document.getElementById('confirmOverlay').classList.add('hidden');
+    deleteTargetId = null; deleteTargetType = null;
+  };
+
+  window.confirmDelete = function() {
+    if (!deleteTargetId) return;
+    const data = loadData();
+    if (deleteTargetType === 'countdown') {
+      data.countdowns = data.countdowns.filter(c => c.id !== deleteTargetId);
+    } else {
+      data.memorials = data.memorials.filter(m => m.id !== deleteTargetId);
+    }
+    saveData(data); closeConfirm(); refreshAll();
+    showToast('已删除 🗑', 'success');
+  };
+
+  // ==================== Settings ====================
+  window.openSettings = function() {
+    const data = loadData();
+    document.getElementById('setSiteTitle').value = data.settings.siteTitle || 'Q&L';
+    document.getElementById('setNewPwd').value = '';
+    document.getElementById('setLoveStart').value = data.settings.love_start_date || '2024-03-15';
+    document.getElementById('settingsOverlay').classList.remove('hidden');
+  };
+  window.closeSettings = function() { document.getElementById('settingsOverlay').classList.add('hidden'); };
+  window.saveSettings = function() {
+    const data = loadData();
+    const siteTitle = document.getElementById('setSiteTitle').value.trim();
+    const newPwd = document.getElementById('setNewPwd').value.trim();
+    const loveStart = document.getElementById('setLoveStart').value;
+    if (siteTitle) data.settings.siteTitle = siteTitle;
+    if (newPwd) data.settings.password = newPwd;
+    if (loveStart) data.settings.love_start_date = loveStart;
+    // 先存本地，再直接请求服务端确保写入
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).catch(() => {});
+    closeSettings();
+    showToast('设置已保存 ⚙️', 'success');
+  };
+
+  // ==================== Toast ====================
+  function showToast(msg, type) {
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.className = 'toast ' + (type || 'success');
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => { if (toast.parentNode) toast.remove(); }, 2800);
+  }
+
+  // ==================== Modal 点击遮罩关闭 ====================
+  document.getElementById('cdModalOverlay').addEventListener('click', function(e) { if (e.target === this) closeCdModal(); });
+  document.getElementById('memModalOverlay').addEventListener('click', function(e) { if (e.target === this) closeMemModal(); });
+  document.getElementById('settingsOverlay').addEventListener('click', function(e) { if (e.target === this) closeSettings(); });
+  document.getElementById('confirmOverlay').addEventListener('click', function(e) { if (e.target === this) closeConfirm(); });
+
+  // ==================== 实时刷新 ====================
+  setInterval(function() {
+    if (!document.getElementById('mainContainer').classList.contains('hidden')) refreshAll();
+  }, 1000);
+
+  // ==================== 跨标签页同步 ====================
+  window.addEventListener('storage', function(e) {
+    if (e.key === STORAGE_KEY) refreshAll();
+  });
+
+})();
+</script>
+</body>
+</html>
